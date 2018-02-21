@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "log.h"
 
 extern void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top);
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
@@ -404,6 +405,15 @@ int main(int argc, char **argv)
     }
 #endif
 
+	FILE* logFP = fopen("logfile.txt", "a");
+	if (logFP == NULL) {
+		fprintf(stderr, "Issue opening log file");
+		return 0;
+	} else {
+		log_set_quiet(1);
+		log_set_fp(logFP);
+	}
+
     if (0 == strcmp(argv[1], "average")){
         average(argc, argv);
     } else if (0 == strcmp(argv[1], "yolo")){
@@ -483,6 +493,9 @@ int main(int argc, char **argv)
     } else {
         fprintf(stderr, "Not an option: %s\n", argv[1]);
     }
+
+	fclose(logFP);
+
     return 0;
 }
 

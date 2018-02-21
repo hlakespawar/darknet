@@ -4,6 +4,7 @@
 #include "cuda.h"
 #include <stdio.h>
 #include <math.h>
+#include <log.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -238,7 +239,8 @@ image **load_alphabet()
 void draw_detections(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes)
 {
     int i,j;
-
+	static int fn = 0;
+	
     for(i = 0; i < num; ++i){
         char labelstr[4096] = {0};
         int class = -1;
@@ -256,13 +258,6 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
         }
         if(class >= 0){
             int width = im.h * .006;
-
-            /*
-               if(0){
-               width = pow(prob, 1./2.)*10+1;
-               alphabet = 0;
-               }
-             */
 
             //printf("%d %s: %.0f%%\n", i, names[class], prob*100);
             int offset = class*123457 % classes;
@@ -289,6 +284,15 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             if(bot > im.h-1) bot = im.h-1;
 
             draw_box_width(im, left, top, right, bot, width, red, green, blue);
+
+			/* Code from Hunter Lake to output class && bounding box data into log file */
+			
+			for(j = 0; j < classes; ++j){
+				if (probs[i][j] > thresh){
+					log_trace("%i %s %.1f %i %i %i %i", fn, names[j], 100*probs[i][j], left, top, right, bot);
+				}
+			}
+			
             if (alphabet) {
                 image label = get_label(alphabet, labelstr, (im.h*.03)/10);
                 draw_label(im, top + width, left, label, rgb);
@@ -305,6 +309,7 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             }
         }
     }
+	fn++;
 }
 
 void transpose_image(image im)
@@ -525,21 +530,23 @@ void show_image_cv(image p, const char *name, IplImage *disp)
             }
         }
     }
-    if(0){
-        int w = 448;
-        int h = w*p.h/p.w;
-        if(h > 1000){
-            h = 1000;
-            w = h*p.w/p.h;
-        }
-        IplImage *buffer = disp;
-        disp = cvCreateImage(cvSize(w, h), buffer->depth, buffer->nChannels);
-        cvResize(buffer, disp, CV_INTER_LINEAR);
-        cvReleaseImage(&buffer);
-    }
     cvShowImage(buff, disp);
+
+	/* to save the video to a file -- added by Hunter Lake from https://github.com/pjreddie/darknet/issues/102 */
+	CvSize size;
+	size.width = disp->width;
+	size.height = disp->height;
+
+	static CvVideoWriter* output_video = NULL;
+	if (output_video == NULL) {
+		const char* output_name = "test_output.mpg";
+		output_video = cvCreateVideoWriter(output_name, CV_FOURCC('M', 'P', 'G', '2'), 25, size, 1);
+	}
+	cvWriteFrame(output_video, disp);
+
 }
 #endif
+
 
 void show_image(image p, const char *name)
 {
@@ -628,10 +635,20 @@ image get_image_from_stream(CvCapture *cap)
     rgbgr_image(im);
     return im;
 }
-
+/* modified by Hunter Lake on 2/13/2018 
+   --> old image.c file saved under ../image.c.save
+   Current version eats 2/3 frames so that we can keep up with the framerate
+*/
 int fill_image_from_stream(CvCapture *cap, image im)
 {
-    IplImage* src = cvQueryFrame(cap);
+	IplImage* temp = cvQueryFrame(cap);
+	IplImage* src = NULL;
+	int i = 0;
+	while( i < 3 && temp ) {
+		temp = cvQueryFrame(cap);
+		if( temp ) src = temp;
+		i++;
+	}
     if (!src) return 0;
     ipl_into_image(src, im);
     rgbgr_image(im);

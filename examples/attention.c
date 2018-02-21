@@ -40,10 +40,8 @@ matrix network_loss_data(network *net, data test)
         float *delta = net->layers[net->n-1].output;
         for(b = 0; b < net->batch; ++b){
             if(i+b == test.X.rows) break;
-            int t = max_index(y + b*test.y.cols, 1000);
             float err = sum_array(delta + b*net->outputs, net->outputs);
             pred.vals[i+b][0] = -err;
-            //pred.vals[i+b][0] = 1-delta[b*net->outputs + t];
         }
     }
     free(X);
@@ -176,15 +174,6 @@ void train_attention(char *datacfg, char *cfgfile, char *weightfile, int *gpus, 
         }
         free_data(best);
         printf("\n");
-        image im = float_to_image(64,64,3,resized.X.vals[0]);
-        //show_image(im, "orig");
-        //cvWaitKey(100);
-        /*
-           image im1 = float_to_image(64,64,3,tiles[i].X.vals[0]);
-           image im2 = float_to_image(64,64,3,resized.X.vals[0]);
-           show_image(im1, "tile");
-           show_image(im2, "res");
-         */
 #ifdef GPU
         if (ngpus == 1) {
             aloss = train_network(net, resized);
@@ -449,7 +438,6 @@ void run_attention(int argc, char **argv)
     char *cfg = argv[4];
     char *weights = (argc > 5) ? argv[5] : 0;
     char *filename = (argc > 6) ? argv[6]: 0;
-    char *layer_s = (argc > 7) ? argv[7]: 0;
     if(0==strcmp(argv[2], "predict")) predict_attention(data, cfg, weights, filename, top);
     else if(0==strcmp(argv[2], "train")) train_attention(data, cfg, weights, gpus, ngpus, clear);
     else if(0==strcmp(argv[2], "valid")) validate_attention_single(data, cfg, weights);
